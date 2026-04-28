@@ -464,18 +464,6 @@ Analyze this failing integration test, identify the root cause, and implement a 
 
 oc-router classifies the request and selects a tier such as `balanced` or `large`.
 
-```mermaid
-flowchart LR
-  A[User request] --> B[oc-router classifier]
-  B --> C{Task complexity}
-  C -->|Simple| D[@fast]
-  C -->|Normal| E[@balanced]
-  C -->|Complex or risky| F[@large]
-  D --> G[OpenCode execution]
-  E --> G
-  F --> G
-```
-
 ### Forced tier prefixes
 
 Use a forced prefix when you already know which tier should handle the task.
@@ -497,47 +485,6 @@ Use a forced prefix when you already know which tier should handle the task.
 | `/fast` | `fast` | Simple edits, short answers, low-risk tasks |
 | `/balanced` | `balanced` | Normal coding, tests, refactoring, documentation |
 | `/large` | `large` | Architecture, security, hard debugging, high-risk changes |
-
-### Context handoff
-
-Use context handoff when one tier prepares work for another tier.
-
-Examples:
-
-```text
-@fast inspect the repository and summarize the files relevant to routing configuration.
-```
-
-```text
-@balanced implement the plan from the handoff and run the relevant tests.
-```
-
-```text
-@large use the handoff context to review the design for correctness and security risks.
-```
-
-A good handoff should include:
-
-- Goal and current status
-- Files already read or modified
-- Commands already run
-- Known failures or uncertainty
-- Exact next steps
-
-### Router failure handling
-
-If the router cannot classify a request, oc-router should fail safely:
-
-```text
-Router classification failed; using the configured fallback tier.
-```
-
-Recommended fallback behavior:
-
-- Use `balanced` for general reliability.
-- Use `manual-only` when configuration is invalid.
-- Show a toast or banner when fallback routing occurs.
-- Do not silently escalate to expensive models unless explicitly configured.
 
 ---
 
@@ -582,41 +529,18 @@ oc-router sits between the user request and OpenCode tier execution.
 │  prefix parser   │
 └────────┬─────────┘
          │
-         ├────────────── forced prefix ──────────────┐
+         ├────────────── forced prefix ───────────────┐
          │                                            │
          ▼                                            ▼
-┌──────────────────┐                         ┌──────────────────┐
-│ Router Classifier│                         │ Selected Tier     │
+┌──────────────────┐                         ┌────────────────────┐
+│ Router Classifier│                         │ Selected Tier      │
 │ auto/manual/off  │                         │ fast/balanced/large│
-└────────┬─────────┘                         └────────┬─────────┘
+└────────┬─────────┘                         └────────┬───────────┘
          │                                            │
          ▼                                            ▼
-┌──────────────────┐                         ┌──────────────────┐
+┌──────────────────┐                         ┌───────────────────┐
 │ Fallback Policy  │────────────────────────▶│ OpenCode Agent    │
-└──────────────────┘                         └──────────────────┘
-```
-
-### Decision flow
-
-```mermaid
-sequenceDiagram
-  participant User
-  participant Router as oc-router
-  participant Config
-  participant Agent as OpenCode tier agent
-
-  User->>Router: Submit prompt
-  Router->>Config: Load effective config
-  Router->>Router: Detect forced prefix
-  alt Forced tier found
-    Router->>Agent: Dispatch to selected tier
-  else Auto routing enabled
-    Router->>Router: Classify task complexity
-    Router->>Agent: Dispatch to best tier
-  else Routing disabled
-    Router->>Agent: Continue without routing
-  end
-  Agent->>User: Return result
+└──────────────────┘                         └───────────────────┘
 ```
 
 ### Tier selection guide
@@ -743,25 +667,6 @@ npm install
 npm run build
 npm test
 ```
-
-### Suggested project structure
-
-```text
-oc-router/
-├── src/
-│   ├── cli/              # CLI entrypoints and commands
-│   ├── config/           # Configuration loading, merging, validation
-│   ├── routing/          # Prefix parsing and automatic tier selection
-│   ├── tiers/            # Tier definitions and capability handling
-│   └── display/          # Banners, colors, and toast messages
-├── tests/                # Unit and integration tests
-├── scripts/              # Install and release helpers
-├── README.md             # Project documentation
-└── package.json          # npm package metadata
-```
-
-> [!TIP]
-> Keep routing logic deterministic where possible. The router model should classify intent, but fallback behavior, permissions, and display output should be predictable and testable.
 
 ---
 
