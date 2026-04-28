@@ -1,0 +1,54 @@
+{
+  "name": "oc-router",
+  "version": "0.1.0",
+  "description": "OpenCode plugin and CLI for routing each request across model tiers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./plugin": "./dist/plugin.js",
+    "./cli": "./dist/cli.js"
+  },
+  "bin": {
+    "oc-router": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RuslanKoroy/oc-router.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RuslanKoroy/oc-router/issues"
+  },
+  "homepage": "https://github.com/RuslanKoroy/oc-router#readme",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "router",
+    "llm"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=0.11.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "latest",
+    "@types/node": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.4.2"
+  }
+}
