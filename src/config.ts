@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { homedir } from "node:os"
+import { dirname } from "node:path"
 import { isModelID } from "./model-id.js"
+import { globalConfigPath, projectConfigPath } from "./paths.js"
 import type { PartialRouterConfig, RouterConfig, Tier } from "./types.js"
 
 export const defaultConfig: RouterConfig = {
@@ -65,13 +65,7 @@ export const defaultConfig: RouterConfig = {
   },
 }
 
-export function globalConfigPath() {
-  return join(homedir(), ".config", "oc-router", "config.json")
-}
-
-export function projectConfigPath(cwd = process.cwd()) {
-  return join(cwd, ".opencode", "router.json")
-}
+export { globalConfigPath, projectConfigPath } from "./paths.js"
 
 function readConfig(path: string): PartialRouterConfig | undefined {
   if (!existsSync(path)) return undefined

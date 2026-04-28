@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { defaultConfig, globalConfigPath, mergeConfig, projectConfigPath, writeRouterConfig } from "./config.js"
+import { defaultConfig, mergeConfig, writeRouterConfig } from "./config.js"
+import { globalConfigPath, globalModelsReportPath, globalOpenCodeAgentsDir, globalOpenCodeConfigPath, globalOpenCodePluginsDir, projectConfigPath, projectModelsReportPath, projectOpenCodeAgentsDir, projectOpenCodeCommandsDir, projectOpenCodeConfigPath, projectOpenCodePluginsDir } from "./paths.js"
 import { buildModelsReport, listOpenCodeModels } from "./models-report.js"
 import type { RouterConfig, Tier } from "./types.js"
 
@@ -134,7 +135,7 @@ export function writeOpenCodeAgentFiles(directory: string, config: RouterConfig)
 }
 
 function reportPath(cwd: string, scope: "project" | "global") {
-  return scope === "project" ? join(cwd, ".opencode", "router-models.md") : join(process.env.HOME ?? "", ".config", "oc-router", "models.md")
+  return scope === "project" ? projectModelsReportPath(cwd) : globalModelsReportPath()
 }
 
 export function installRouter(input: { cwd: string; scope: "project" | "global"; yes: boolean; modelsOutput?: string; config?: RouterConfig }) {
@@ -146,15 +147,39 @@ export function installRouter(input: { cwd: string; scope: "project" | "global";
   writeFileSync(modelsReportPath, buildModelsReport({ modelsOutput: input.modelsOutput ?? listOpenCodeModels(input.cwd) }))
 
   if (input.scope === "project") {
-    ensureOpenCodePlugin(join(input.cwd, "opencode.json"))
-    writeOpenCodePluginFile(join(input.cwd, ".opencode", "plugins"))
-    writeOpenCodeAgentFiles(join(input.cwd, ".opencode", "agents"), config)
-    writeOpenCodeCommands(join(input.cwd, ".opencode", "commands"))
+    ensureOpenCodePlugin(projectOpenCodeConfigPath(input.cwd))
+    writeOpenCodePluginFile(projectOpenCodePluginsDir(input.cwd))
+    writeOpenCodeAgentFiles(projectOpenCodeAgentsDir(input.cwd), config)
+    writeOpenCodeCommands(projectOpenCodeCommandsDir(input.cwd))
   } else {
-    const globalOpenCode = join(process.env.HOME ?? "", ".config", "opencode", "opencode.json")
-    ensureOpenCodePlugin(globalOpenCode)
-    writeOpenCodePluginFile(join(process.env.HOME ?? "", ".config", "opencode", "plugins"))
-    writeOpenCodeAgentFiles(join(process.env.HOME ?? "", ".config", "opencode", "agents"), config)
+    ensureOpenCodePlugin(globalOpenCodeConfigPath())
+    writeOpenCodePluginFile(globalOpenCodePluginsDir())
+    writeOpenCodeAgentFiles(globalOpenCodeAgentsDir(), config)
   }
   return { routerPath, modelsReportPath }
+}
+
+/**
+ * Validate that oc-router is properly installed.
+ * Checks critical config files using cross-platform paths.
+ */
+export function validateInstallation(): { installed: boolean; path?: string; reason?: string } {
+  const globalRouterPath = globalConfigPath()
+  const globalOpenCodePath = globalOpenCodeConfigPath()
+  
+  if (!existsSync(globalRouterPath)) {
+    return { 
+      installed: false, 
+      reason: 'oc-router не установлен. Выполните "oc-router init" для установки.' 
+    }
+  }
+  
+  if (!existsSync(globalOpenCodePath)) {
+    return { 
+      installed: false, 
+      reason: 'OpenCode не установлен или не сконфигурирован. oc-router требует установленный OpenCode.' 
+    }
+  }
+  
+  return { installed: true, path: globalRouterPath }
 }
