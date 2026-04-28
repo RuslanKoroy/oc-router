@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>oc-router — как OpenCode выбирает правильную модель для каждой задачи</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+    :root {
+      --ink: #121418;
+      --muted: #5d6470;
+      --paper: #f6f1e8;
+      --paper-2: #fffaf0;
+      --line: #d7ccba;
+      --steel: #253244;
+      --blue: #2d5cff;
+      --blue-soft: #dce5ff;
+      --amber: #ffb02e;
+      --amber-soft: #fff0cd;
+      --green: #1d8c65;
+      --green-soft: #d9f3e9;
+      --red: #c74335;
+      --red-soft: #ffe2dd;
+      --violet: #6b54d3;
+      --code-bg: #111820;
+      --code-line: #273241;
+      --code-text: #e7edf5;
+      --shadow: 0 24px 70px rgba(37, 50, 68, .16);
+      --radius: 22px;
+      --body: 'Source Serif 4', Georgia, serif;
+      --display: 'Space Grotesk', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(255,176,46,.18), transparent 28rem),
+        radial-gradient(circle at 88% 12%, rgba(45,92,255,.14), transparent 32rem),
+        linear-gradient(90deg, rgba(18,20,24,.035) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, auto, 42px 42px, auto;
+      font-family: var(--body);
+      font-size: 19px;
+      line-height: 1.72;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .18;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+      mix-blend-mode: multiply;
+    }
+    .progress {
+      position: fixed;
+      z-index: 40;
+      inset: 0 0 auto 0;
+      height: 5px;
+      background: linear-gradient(90deg, var(--blue), var(--amber), var(--green));
+      transform-origin: left;
+      animation: progress linear;
+      animation-timeline: scroll(root);
+    }
+    @keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+    .shell { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 56px; max-width: 1440px; margin: 0 auto; padding: 34px 34px 90px; }
+    aside { position: sticky; top: 28px; align-self: start; height: calc(100vh - 56px); overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255,250,240,.78); backdrop-filter: blur(16px); box-shadow: var(--shadow); }
+    .toc-title { font-family: var(--display); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; margin: 0 0 12px; color: var(--steel); }
+    .toc a { display: block; color: var(--muted); text-decoration: none; font-family: var(--display); font-size: 14px; line-height: 1.35; padding: 9px 10px; border-radius: 12px; border-left: 3px solid transparent; }
+    .toc a:hover, .toc a:focus { color: var(--ink); background: var(--blue-soft); border-left-color: var(--blue); outline: none; }
+    .toc small { display: block; color: var(--muted); font-family: var(--mono); margin-top: 18px; font-size: 11px; }
+    main { min-width: 0; }
+    article { max-width: 940px; }
+    .hero { position: relative; padding: 86px 0 70px; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--blue); background: var(--blue-soft); padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(45,92,255,.25); }
+    h1, h2, h3, h4 { font-family: var(--display); line-height: 1.02; letter-spacing: -.04em; color: var(--ink); }
+    h1 { font-size: clamp(48px, 8vw, 108px); margin: 26px 0 24px; max-width: 11ch; }
+    h2 { font-size: clamp(34px, 5vw, 66px); margin: 110px 0 26px; padding-top: 12px; }
+    h3 { font-size: clamp(25px, 3vw, 38px); margin: 54px 0 16px; }
+    h4 { font-size: 22px; margin: 32px 0 8px; letter-spacing: -.02em; }
+    p, li { max-width: 70ch; }
+    a.anchor { color: inherit; text-decoration: none; }
+    a.anchor:hover::after { content: " #"; color: var(--blue); }
+    .lead { font-size: clamp(23px, 2.4vw, 32px); line-height: 1.45; max-width: 34ch; color: var(--steel); }
+    .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 38px 0; max-width: 760px; }
+    .meta { padding: 18px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255,250,240,.72); }
+    .meta b { display: block; font-family: var(--display); font-size: 13px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    .meta span { font-family: var(--mono); font-size: 16px; color: var(--ink); }
+
+    .section-kicker { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .12em; margin-bottom: -80px; }
+    .callout, .quote { margin: 32px 0; padding: 24px 28px; border-radius: var(--radius); border: 1px solid var(--line); background: rgba(255,250,240,.82); box-shadow: 0 18px 60px rgba(37,50,68,.08); }
+    .callout { border-left: 7px solid var(--blue); }
+    .callout.warn { border-left-color: var(--amber); background: linear-gradient(135deg, var(--amber-soft), rgba(255,250,240,.88)); }
+    .callout.good { border-left-color: var(--green); background: linear-gradient(135deg, var(--green-soft), rgba(255,250,240,.88)); }
+    .quote { position: relative; font-size: 27px; line-height: 1.36; font-weight: 700; color: var(--steel); border: 0; background: var(--ink); color: var(--paper-2); transform: rotate(-1deg); }
+    .quote::before { content: "“"; font-family: var(--display); font-size: 96px; line-height: .4; color: var(--amber); position: absolute; top: 18px; left: 18px; opacity: .55; }
+    .quote p { margin: 0; padding-left: 42px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0; }
+    .tag { font-family: var(--mono); font-size: 13px; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; color: var(--steel); }
+
+    .diagram { margin: 36px 0 52px; padding: 20px; border: 1px solid var(--line); border-radius: 28px; background: rgba(255,250,240,.9); box-shadow: var(--shadow); overflow: hidden; }
+    .diagram figcaption { font-family: var(--display); font-size: 15px; color: var(--muted); margin: 0 0 14px; }
+    svg { width: 100%; height: auto; display: block; }
+    .svg-title { font-family: var(--display); font-size: 18px; font-weight: 700; fill: var(--ink); }
+    .svg-label { font-family: var(--display); font-size: 14px; font-weight: 700; fill: var(--ink); }
+    .svg-small { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+    .node { fill: #fffaf0; stroke: #253244; stroke-width: 1.5; }
+    .node-blue { fill: #dce5ff; stroke: #2d5cff; stroke-width: 2; }
+    .node-amber { fill: #fff0cd; stroke: #ffb02e; stroke-width: 2; }
+    .node-green { fill: #d9f3e9; stroke: #1d8c65; stroke-width: 2; }
+    .node-red { fill: #ffe2dd; stroke: #c74335; stroke-width: 2; }
+    .boundary { fill: rgba(37,50,68,.035); stroke: #d7ccba; stroke-width: 1.5; stroke-dasharray: 7 6; }
+    .arrow { stroke: #253244; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    .arrow-blue { stroke: #2d5cff; }
+    .arrow-amber { stroke: #b77900; }
+    .arrow-green { stroke: #1d8c65; }
+    .arrow-red { stroke: #c74335; stroke-dasharray: 6 5; }
+
+    .code-card { margin: 28px 0; border-radius: 22px; overflow: hidden; background: var(--code-bg); box-shadow: 0 24px 70px rgba(17,24,32,.28); border: 1px solid #344154; }
+    .code-head { display: flex; justify-content: space-between; gap: 16px; padding: 13px 16px; background: #182230; color: #b9c4d3; font-family: var(--mono); font-size: 13px; border-bottom: 1px solid #344154; }
+    .code-note { padding: 14px 16px 0; color: #b9c4d3; font-family: var(--body); font-size: 16px; line-height: 1.5; }
+    pre { margin: 0; padding: 16px 0 18px; overflow-x: auto; color: var(--code-text); font-family: var(--mono); font-size: 14px; line-height: 1.65; }
+    code { font-family: var(--mono); }
+    .ln { display: inline-block; width: 42px; margin-right: 14px; text-align: right; color: #748196; user-select: none; border-right: 1px solid var(--code-line); padding-right: 12px; }
+    .kw { color: #ffcc66; } .str { color: #9ee493; } .fn { color: #8fb3ff; } .cm { color: #748196; } .tp { color: #ff9db1; }
+
+    table { width: 100%; border-collapse: collapse; margin: 28px 0; font-size: 17px; background: rgba(255,250,240,.72); border-radius: 18px; overflow: hidden; box-shadow: 0 14px 45px rgba(37,50,68,.07); }
+    th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    th { font-family: var(--display); background: var(--steel); color: var(--paper-2); }
+    tr:last-child td { border-bottom: 0; }
+    .steps { counter-reset: step; list-style: none; padding-left: 0; }
+    .steps li { counter-increment: step; position: relative; padding: 0 0 24px 58px; border-left: 2px solid var(--line); margin-left: 18px; max-width: 74ch; }
+    .steps li::before { content: counter(step); position: absolute; left: -19px; top: 0; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--blue); color: white; font-family: var(--display); font-weight: 700; box-shadow: 0 8px 20px rgba(45,92,255,.28); }
+    .steps li:last-child { border-left-color: transparent; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 900px; }
+    .mini-card { padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,250,240,.78); }
+    .mini-card h4 { margin-top: 0; }
+    footer { margin-top: 120px; padding-top: 32px; border-top: 1px solid var(--line); color: var(--muted); font-family: var(--display); }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; padding: 16px; }
+      aside { position: relative; top: 0; height: auto; }
+      details.mobile-toc summary { cursor: pointer; font-family: var(--display); font-weight: 700; }
+      aside .toc { margin-top: 12px; }
+      .hero { padding-top: 42px; }
+      .meta-grid, .two-col { grid-template-columns: 1fr; }
+      body { font-size: 18px; }
+    }
+    @media (min-width: 981px) { details.mobile-toc summary { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <div class="shell">
+    <aside>
+      <details class="mobile-toc" open>
+        <summary>Оглавление</summary>
+        <nav class="toc" aria-label="Оглавление">
+          <p class="toc-title">oc-router / article.html</p>
+          <a href="#why">1. Зачем это существует</a>
+          <a href="#outside">2. Как выглядит снаружи</a>
+          <a href="#inside">3. Большая картина изнутри</a>
+          <a href="#mechanisms">4. Ключевые механизмы</a>
+          <a href="#data">5. Данные</a>
+          <a href="#logic">6. Логика шаг за шагом</a>
+          <a href="#decisions">7. Невидимые решения</a>
+          <a href="#run">8. Как запустить</a>
+          <small>Одностраничная статья. Диаграммы — SVG/CSS, без внешних изображений.</small>
+        </nav>
+      </details>
+    </aside>
+
+    <main>
+      <article>
+        <header class="hero">
+          <span class="eyebrow">OpenCode plugin · router · tier agents</span>
+          <h1>oc-router: диспетчер моделей для OpenCode</h1>
+          <p class="lead">Проект <strong>oc-router</strong> решает простую, но дорогую проблему: не каждую просьбу к AI‑ассистенту нужно отдавать самой мощной модели. Иногда нужен быстрый разведчик, иногда аккуратный универсал, иногда тяжёлая артиллерия.</p>
+          <div class="meta-grid">
+            <div class="meta"><b>Язык</b><span>TypeScript / ESM</span></div>
+            <div class="meta"><b>Интеграция</b><span>@opencode-ai/plugin</span></div>
+            <div class="meta"><b>Роль</b><span>умная маршрутизация запросов</span></div>
+          </div>
+          <p>Эта статья объясняет проект от человеческой причины до конкретных файлов: <code>src/plugin.ts</code>, <code>src/router.ts</code>, <code>src/config.ts</code>, <code>src/install.ts</code> и остальных модулей.</p>
+        </header>
+
+        <section id="why">
+          <p class="section-kicker">Часть 1</p>
+          <h2><a class="anchor" href="#why">Зачем это существует</a></h2>
+          <p>Представьте команду разработчиков, которая постоянно пользуется AI‑помощником в редакторе. Они просят его посмотреть файлы, объяснить ошибку, написать тест, спроектировать новую архитектуру, провести ревью безопасности. Все эти просьбы звучат одинаково: человек пишет текст. Но внутри они очень разные по цене ошибки.</p>
+          <p>До <strong>oc-router</strong> пользователь обычно выбирал модель вручную. Это похоже на гараж, где есть велосипед, обычная машина и грузовик, но каждая поездка начинается с вопроса: «На чём ехать?» За хлебом на грузовике — дорого и медленно. Перевозить пианино на велосипеде — опасно. А если выбирать некогда, люди оставляют один вариант по умолчанию и переплачивают либо рискуют качеством.</p>
+          <p><strong>oc-router</strong> ставит между человеком и моделями диспетчера. Пользователь пишет обычную просьбу, а диспетчер решает: это работа для быстрого дешёвого помощника, для основной модели или для самой сильной модели.</p>
+          <div class="quote"><p>Главная идея проекта: модель выбирается не по привычке пользователя, а по смыслу задачи.</p></div>
+          <h3>Один конкретный сценарий</h3>
+          <p>Разработчица Лена работает в большом репозитории. Утром она пишет: «Найди, где формируется конфиг роутера». Это безопасная разведка: достаточно прочитать файлы и составить карту. <strong>oc-router</strong> отправляет запрос в tier <code>fast</code>.</p>
+          <p>Через десять минут Лена пишет: «Исправь баг в fallback‑логике и добавь тест». Это уже изменение кода: нужен tier <code>balanced</code>. После обеда она просит: «Оцени архитектуру делегирования между агентами и предложи безопасный редизайн». Это дорогая задача с риском неверного решения — запрос уходит в <code>large</code>.</p>
+          <p>Для Лены интерфейс остаётся тем же. Меняется только внутренний исполнитель.</p>
+        </section>
+
+        <section id="outside">
+          <p class="section-kicker">Часть 2</p>
+          <h2><a class="anchor" href="#outside">Как это выглядит снаружи</a></h2>
+          <p>Снаружи проект выглядит как плагин OpenCode и отдельная команда <code>oc-router</code>. Плагин работает во время чата, а CLI помогает установить, настроить и диагностировать систему.</p>
+          <figure class="diagram">
+            <figcaption>Пользовательский путь: от установки до ежедневного использования.</figcaption>
+            <svg viewBox="0 0 920 240" role="img" aria-label="User flow diagram">
+              <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#253244"/></marker></defs>
+              <rect class="node-blue" x="24" y="70" width="170" height="86" rx="18"/><text class="svg-label" x="52" y="104">oc-router init</text><text class="svg-small" x="52" y="128">мастер настройки</text>
+              <path class="arrow" d="M198 113 H282"/>
+              <rect class="node" x="286" y="52" width="190" height="122" rx="18"/><text class="svg-label" x="318" y="88">выбор моделей</text><text class="svg-small" x="318" y="112">router / fast / balanced / large</text><text class="svg-small" x="318" y="136">проектный или глобальный конфиг</text>
+              <path class="arrow" d="M480 113 H560"/>
+              <rect class="node-amber" x="564" y="70" width="150" height="86" rx="18"/><text class="svg-label" x="598" y="104">OpenCode</text><text class="svg-small" x="598" y="128">обычный чат</text>
+              <path class="arrow" d="M718 113 H795"/>
+              <rect class="node-green" x="798" y="60" width="100" height="106" rx="18"/><text class="svg-label" x="822" y="96">ответ</text><text class="svg-small" x="815" y="120">+ баннер</text><text class="svg-small" x="815" y="140">о tier</text>
+            </svg>
+          </figure>
+          <h3>Что делает пользователь</h3>
+          <ul>
+            <li>Запускает <code>oc-router init</code>, чтобы пройти интерактивную настройку.</li>
+            <li>Смотрит доступные модели через <code>oc-router models</code>.</li>
+            <li>Проверяет состояние через <code>oc-router status</code> или <code>oc-router doctor</code>.</li>
+            <li>Меняет параметры через <code>oc-router config get</code> и <code>oc-router config set</code>.</li>
+            <li>В OpenCode пишет обычные сообщения, иногда принудительно добавляя <code>/fast</code>, <code>/balanced</code> или <code>/large</code>.</li>
+          </ul>
+          <div class="callout good"><strong>Почему так спроектировано:</strong> пользователь не должен изучать внутренности маршрутизатора ради обычной работы. Но когда нужно вмешаться, есть явные команды, конфиги и принудительные префиксы.</div>
+
+          <h3>Поверхность конфигурации</h3>
+          <p>У проекта две точки хранения настроек: глобальная <code>~/.config/oc-router/config.json</code> и проектная <code>.opencode/router.json</code>. Проектная настройка сильнее глобальной: это позволяет иметь общую привычную схему и переопределять модели в конкретном репозитории.</p>
+          <div class="code-card">
+            <div class="code-head"><span>.opencode/router.json</span><span>пример идеи конфигурации</span></div>
+            <div class="code-note">Конфиг описывает не только модели, но и поведение дисплея, маршрутизации и fallback.</div>
+            <pre><code><span class="ln">1</span>{
+<span class="ln">2</span>  <span class="str">"enabled"</span>: true,
+<span class="ln">3</span>  <span class="str">"router"</span>: { <span class="str">"model"</span>: <span class="str">"provider/router-model"</span> },
+<span class="ln">4</span>  <span class="str">"tiers"</span>: {
+<span class="ln">5</span>    <span class="str">"fast"</span>: { <span class="str">"model"</span>: <span class="str">"provider/cheap-model"</span> },
+<span class="ln">6</span>    <span class="str">"balanced"</span>: { <span class="str">"model"</span>: <span class="str">"provider/default-model"</span> },
+<span class="ln">7</span>    <span class="str">"large"</span>: { <span class="str">"model"</span>: <span class="str">"provider/strong-model"</span> }
+<span class="ln">8</span>  },
+<span class="ln">9</span>  <span class="str">"fallbackTier"</span>: <span class="str">"balanced"</span>
+<span class="ln">10</span>}</code></pre>
+          </div>
+        </section>
+
+        <section id="inside">
+          <p class="section-kicker">Часть 3</p>
+          <h2><a class="anchor" href="#inside">Большая картина изнутри</a></h2>
+          <p>Внутри <strong>oc-router</strong> состоит из четырёх больших областей: плагина OpenCode, маршрутизатора решений, конфигурационной системы и CLI/инсталлятора. Пятый слой — агенты tier‑ов — создаётся плагином как часть OpenCode‑окружения.</p>
+          <figure class="diagram">
+            <figcaption>Архитектура: границы между пользователем, OpenCode, плагином, конфигурацией и моделями.</figcaption>
+            <svg viewBox="0 0 1040 610" role="img" aria-label="Architecture overview">
+              <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#253244"/></marker></defs>
+              <rect class="boundary" x="20" y="24" width="1000" height="560" rx="28"/><text class="svg-title" x="48" y="62">OpenCode workspace</text>
+              <rect class="node-blue" x="56" y="118" width="160" height="90" rx="18"/><text class="svg-label" x="92" y="152">Пользователь</text><text class="svg-small" x="82" y="176">chat message</text>
+              <path class="arrow arrow-blue" d="M218 163 H315"/>
+              <rect class="node" x="320" y="88" width="210" height="150" rx="22"/><text class="svg-label" x="358" y="122">src/plugin.ts</text><text class="svg-small" x="352" y="150">chat.message hook</text><text class="svg-small" x="352" y="172">config hook</text><text class="svg-small" x="352" y="194">system transform</text>
+              <path class="arrow" d="M530 144 H632"/>
+              <rect class="node-amber" x="638" y="94" width="175" height="100" rx="18"/><text class="svg-label" x="680" y="128">src/router.ts</text><text class="svg-small" x="668" y="152">routeRequest()</text><text class="svg-small" x="668" y="172">forced prefixes</text>
+              <path class="arrow arrow-amber" d="M725 194 V255"/>
+              <rect class="node-amber" x="642" y="260" width="170" height="88" rx="18"/><text class="svg-label" x="680" y="292">Router model</text><text class="svg-small" x="674" y="316">JSON decision</text>
+              <path class="arrow" d="M638 304 H535"/>
+              <path class="arrow" d="M424 238 V318"/>
+              <rect class="node-green" x="330" y="322" width="190" height="194" rx="22"/><text class="svg-label" x="370" y="356">Tier agents</text><text class="svg-small" x="365" y="386">@fast: read-only</text><text class="svg-small" x="365" y="412">@balanced: default</text><text class="svg-small" x="365" y="438">@large: complex</text><text class="svg-small" x="365" y="468">delegation protocol</text>
+              <path class="arrow arrow-green" d="M520 418 H660"/>
+              <rect class="node-green" x="664" y="374" width="150" height="88" rx="18"/><text class="svg-label" x="700" y="408">Ответ</text><text class="svg-small" x="690" y="432">banner + model</text>
+              <path class="arrow" d="M814 418 H900 V163 H218"/>
+              <rect class="node" x="56" y="360" width="220" height="120" rx="20"/><text class="svg-label" x="92" y="392">src/cli.ts</text><text class="svg-small" x="86" y="418">init · models · config</text><text class="svg-small" x="86" y="442">status · doctor</text>
+              <rect class="node" x="56" y="500" width="220" height="56" rx="16"/><text class="svg-label" x="86" y="534">src/install.ts</text>
+              <path class="arrow" d="M276 420 H300 V210 H320"/>
+              <rect class="node" x="850" y="98" width="130" height="182" rx="20"/><text class="svg-label" x="880" y="132">Config</text><text class="svg-small" x="874" y="160">global</text><text class="svg-small" x="874" y="182">project</text><text class="svg-small" x="874" y="212">mergeConfig()</text><text class="svg-small" x="874" y="236">validate()</text>
+              <path class="arrow" d="M850 188 H814"/>
+              <path class="arrow" d="M850 188 H530"/>
+            </svg>
+          </figure>
+          <p>Главный вход — <code>src/index.ts</code>, который экспортирует плагин. Реальная работа сосредоточена в <code>src/plugin.ts</code>: там OpenCode получает hooks, агенты, системные подсказки и правила отображения.</p>
+          <div class="tag-row"><span class="tag">config hook</span><span class="tag">chat.message hook</span><span class="tag">experimental.text.complete</span><span class="tag">tool.execute.after</span><span class="tag">experimental.chat.system.transform</span></div>
+          <p><code>src/router.ts</code> принимает пользовательский текст и конфиг, затем возвращает <code>RoutingResult</code>: какой tier выбран, какую модель поставить, почему, с какой уверенностью и был ли это принудительный выбор.</p>
+        </section>
+
+        <section id="mechanisms">
+          <p class="section-kicker">Часть 4</p>
+          <h2><a class="anchor" href="#mechanisms">Ключевые механизмы через аналогии</a></h2>
+
+          <h3>1. Router model classification</h3>
+          <p><strong>Аналогия.</strong> Это диспетчер в приёмной больницы. Он не лечит пациента, а решает, куда направить: быстрое окно справок, обычный кабинет или реанимационная команда.</p>
+          <p><strong>Зачем существует.</strong> Без него пользователь сам выбирает модель для каждой задачи. Это утомительно и приводит к двум ошибкам: дорогая модель делает простую работу или слабая модель берётся за рискованную задачу.</p>
+          <p><strong>Как работает технически.</strong> <code>routeRequest()</code> в <code>src/router.ts</code> сначала проверяет принудительные префиксы. Если их нет, строится prompt через <code>buildRouterPrompt()</code> из <code>src/prompts.ts</code>. Router model должна вернуть JSON по схеме <code>routerDecisionSchema</code>: <code>tier</code>, <code>reason</code>, <code>confidence</code>. Затем tier сверяется с конфигом, уверенность сравнивается с <code>routing.minConfidence</code>, и при сомнениях включается fallback.</p>
+          <figure class="diagram">
+            <figcaption>Классификация запроса: router model выбирает не модель напрямую, а tier.</figcaption>
+            <svg viewBox="0 0 820 260" role="img" aria-label="Router classification detail">
+              <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#253244"/></marker></defs>
+              <rect class="node" x="30" y="82" width="170" height="82" rx="18"/><text class="svg-label" x="62" y="116">user request</text><text class="svg-small" x="60" y="140">plain text</text>
+              <path class="arrow" d="M205 123 H286"/>
+              <rect class="node-blue" x="290" y="52" width="210" height="142" rx="20"/><text class="svg-label" x="332" y="88">buildRouterPrompt()</text><text class="svg-small" x="322" y="116">tier descriptions</text><text class="svg-small" x="322" y="138">system prompt</text><text class="svg-small" x="322" y="160">user template</text>
+              <path class="arrow arrow-amber" d="M505 123 H585"/>
+              <rect class="node-amber" x="590" y="60" width="190" height="126" rx="20"/><text class="svg-label" x="632" y="96">JSON decision</text><text class="svg-small" x="626" y="124">tier: large</text><text class="svg-small" x="626" y="146">reason + confidence</text></svg>
+          </figure>
+
+          <h3>2. Delegation protocol</h3>
+          <p><strong>Аналогия.</strong> Это инструкция начальнику смены: «Ты не должен сам чинить всё подряд. Осмотри заявку, выбери правильную бригаду и передай ей задачу».</p>
+          <p><strong>Зачем существует.</strong> OpenCode имеет агентную систему. Проект использует её не как украшение, а как дисциплину: <code>@router</code> — оркестратор, <code>@fast</code>, <code>@balanced</code>, <code>@large</code> — исполнители разных классов задач.</p>
+          <p><strong>Как работает технически.</strong> В <code>src/plugin.ts</code> функция <code>buildDelegationProtocol(config)</code> генерирует обязательный текст системного протокола. Он вставляется через <code>experimental.chat.system.transform</code>. В config hook регистрируются агенты с описаниями, моделями и правами.</p>
+          <div class="code-card"><div class="code-head"><span>src/plugin.ts</span><span>buildDelegationProtocol(config)</span></div><div class="code-note">Протокол описывает роли и требует handoff между агентами.</div><pre><code><span class="ln">1</span><span class="kw">function</span> <span class="fn">buildDelegationProtocol</span>(config: <span class="tp">RouterConfig</span>) {
+<span class="ln">2</span>  <span class="kw">const</span> tiers = <span class="fn">configuredTiers</span>(config)
+<span class="ln">3</span>    .map(([name, tier]) =&gt; <span class="str">`@${name} -&gt; ${tier.model}`</span>)
+<span class="ln">4</span>    .join(<span class="str">"\n"</span>)
+<span class="ln">5</span>  <span class="kw">return</span> [<span class="str">"## Model Delegation Protocol — MANDATORY"</span>, tiers].join(<span class="str">"\n"</span>)
+<span class="ln">6</span>}</code></pre></div>
+
+          <h3>3. Context handoff system</h3>
+          <p><strong>Аналогия.</strong> Разведчик не просто говорит инженеру «там мост». Он приносит карту, фотографии, список рисков и пометки, какие дороги уже проверены. Инженеру не нужно начинать разведку заново.</p>
+          <p><strong>Зачем существует.</strong> Дорогие модели не должны тратить контекст и деньги на повторное чтение файлов, если дешёвый агент уже собрал факты. Это особенно важно для больших репозиториев.</p>
+          <p><strong>Как работает технически.</strong> Протокол в <code>src/plugin.ts</code> требует, чтобы <code>@fast</code> выдавал блок <code>CONTEXT HANDOFF</code>: какие файлы прочитаны, что найдено, какие риски остались. Инструкции для <code>@balanced</code> и <code>@large</code> говорят использовать этот блок как первичный контекст и не перечитывать файлы без причины.</p>
+
+          <h3>4. Permission system</h3>
+          <p><strong>Аналогия.</strong> Стажёру‑разведчику выдают ключ от архива и фонарик, но не выдают ключ от серверной и сварочный аппарат. Он может смотреть, но не ломать.</p>
+          <p><strong>Зачем существует.</strong> Tier <code>fast</code> предназначен для дешёвой безопасной разведки. Если он случайно начнёт редактировать файлы, экономия превратится в риск.</p>
+          <p><strong>Как работает технически.</strong> В <code>src/plugin.ts</code> для <code>@fast</code> разрешены операции чтения и поиска: <code>read</code>, <code>grep</code>, <code>glob</code>, <code>list</code>, <code>bash</code>. Запрещены <code>edit</code>, <code>write</code>, <code>apply_patch</code>, <code>task</code>. Для <code>@balanced</code> и <code>@large</code> разрешены широкие действия, но <code>task</code> всё равно запрещён, чтобы избежать бесконтрольной рекурсии делегирования.</p>
+
+          <h3>5. Configuration hierarchy</h3>
+          <p><strong>Аналогия.</strong> В компании есть общие правила, но у каждого проекта может быть своя инструкция на двери: «В этом цехе используем другие станки». Проектная табличка уточняет, но не уничтожает корпоративный регламент.</p>
+          <p><strong>Зачем существует.</strong> Один пользователь может работать в разных репозиториях с разными требованиями, бюджетом и доступными моделями.</p>
+          <p><strong>Как работает технически.</strong> <code>src/config.ts</code> хранит <code>defaultConfig</code>, читает глобальный и проектный JSON, затем объединяет их через <code>mergeConfig()</code>. Вложенные секции <code>router</code>, <code>tiers</code>, <code>display</code>, <code>routing</code> сливаются рекурсивно. <code>validateRouterConfig()</code> проверяет формат моделей <code>provider/model</code>.</p>
+
+          <h3>6. Error resilience with fallback</h3>
+          <p><strong>Аналогия.</strong> Если диспетчерская рация сломалась, скорая не останавливается на обочине. Она едет по безопасному маршруту по умолчанию.</p>
+          <p><strong>Зачем существует.</strong> Плагин маршрутизации не должен ломать OpenCode. Если router model недоступна, вернула мусор или confidence слишком низкий, пользователь всё равно должен получить работующую сессию.</p>
+          <p><strong>Как работает технически.</strong> В <code>src/router.ts</code> операции маршрутизации обёрнуты в обработку ошибок. При исключении, невалидном tier или низкой уверенности выбирается <code>fallbackTier</code>, по умолчанию <code>balanced</code>. В баннере можно показать причину fallback.</p>
+        </section>
+
+        <section id="data">
+          <p class="section-kicker">Часть 5</p>
+          <h2><a class="anchor" href="#data">Данные: откуда, куда, в каком виде</a></h2>
+          <p>Данные в проекте не хранятся в базе. Они живут в JSON‑конфигах, TypeScript‑объектах, сообщениях OpenCode, ответах router model и сгенерированных файлах установки.</p>
+          <figure class="diagram">
+            <figcaption>Поток данных: пользовательский текст превращается в routing result, затем в выбранную модель и видимый баннер.</figcaption>
+            <svg viewBox="0 0 980 360" role="img" aria-label="Data flow diagram">
+              <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#253244"/></marker></defs>
+              <rect class="node" x="30" y="55" width="160" height="80" rx="18"/><text class="svg-label" x="68" y="88">Message</text><text class="svg-small" x="60" y="112">text parts</text>
+              <path class="arrow" d="M190 95 H270"/>
+              <rect class="node-blue" x="274" y="40" width="170" height="110" rx="18"/><text class="svg-label" x="310" y="74">routeRequest</text><text class="svg-small" x="302" y="100">prefix check</text><text class="svg-small" x="302" y="122">router call</text>
+              <path class="arrow" d="M444 95 H530"/>
+              <rect class="node-amber" x="534" y="38" width="170" height="114" rx="18"/><text class="svg-label" x="574" y="72">Decision</text><text class="svg-small" x="566" y="98">tier</text><text class="svg-small" x="566" y="120">reason/confidence</text>
+              <path class="arrow" d="M704 95 H788"/>
+              <rect class="node-green" x="792" y="55" width="150" height="80" rx="18"/><text class="svg-label" x="830" y="88">Model</text><text class="svg-small" x="818" y="112">provider/model</text>
+              <rect class="node" x="94" y="220" width="210" height="92" rx="18"/><text class="svg-label" x="136" y="254">RouterConfig</text><text class="svg-small" x="124" y="278">global + project + defaults</text>
+              <path class="arrow arrow-blue" d="M304 245 C410 210 455 160 534 120"/>
+              <path class="arrow arrow-green" d="M620 152 V226 H790"/>
+              <rect class="node-green" x="792" y="212" width="150" height="86" rx="18"/><text class="svg-label" x="824" y="246">Banner</text><text class="svg-small" x="816" y="270">synthetic part</text>
+              <path class="arrow" d="M867 212 V136"/>
+            </svg>
+          </figure>
+
+          <h3>Главные сущности</h3>
+          <table>
+            <thead><tr><th>Сущность</th><th>Где определена</th><th>Что содержит</th><th>Куда идёт</th></tr></thead>
+            <tbody>
+              <tr><td><code>Tier</code></td><td><code>src/types.ts</code></td><td><code>fast</code>, <code>balanced</code>, <code>large</code></td><td>Ключ для выбора модели, агента и правил.</td></tr>
+              <tr><td><code>ModelRef</code></td><td><code>src/types.ts</code>, <code>src/model-id.ts</code></td><td>Строка <code>provider/model</code></td><td>Передаётся OpenCode как активная модель.</td></tr>
+              <tr><td><code>TierConfig</code></td><td><code>src/types.ts</code></td><td>Модель, описание, когда использовать, prompt</td><td>Используется router prompt и agent registration.</td></tr>
+              <tr><td><code>RouterConfig</code></td><td><code>src/types.ts</code>, <code>src/config.ts</code></td><td>Вся настройка проекта</td><td>Читается plugin, cli, installer.</td></tr>
+              <tr><td><code>RouterDecision</code></td><td><code>src/types.ts</code>, <code>src/prompts.ts</code></td><td>Выбранный tier, причина, confidence</td><td>Преобразуется в <code>RoutingResult</code>.</td></tr>
+              <tr><td><code>RoutingResult</code></td><td><code>src/types.ts</code></td><td>Итог маршрутизации, модель, fallback flags</td><td>Меняет message model и UI banner.</td></tr>
+            </tbody>
+          </table>
+          <h3>Карта структуры кода</h3>
+          <figure class="diagram">
+            <figcaption>Файловая структура как карта ответственности, а не просто список файлов.</figcaption>
+            <svg viewBox="0 0 920 420" role="img" aria-label="Code structure map">
+              <rect class="node-blue" x="36" y="40" width="180" height="64" rx="16"/><text class="svg-label" x="86" y="78">src/index.ts</text>
+              <rect class="node" x="270" y="28" width="230" height="86" rx="18"/><text class="svg-label" x="326" y="62">src/plugin.ts</text><text class="svg-small" x="308" y="86">hooks + agents + display</text>
+              <rect class="node-amber" x="560" y="28" width="160" height="86" rx="18"/><text class="svg-label" x="602" y="62">router.ts</text><text class="svg-small" x="592" y="86">decision path</text>
+              <rect class="node-amber" x="740" y="28" width="145" height="86" rx="18"/><text class="svg-label" x="775" y="62">prompts.ts</text><text class="svg-small" x="768" y="86">schema + text</text>
+              <rect class="node" x="270" y="154" width="190" height="72" rx="18"/><text class="svg-label" x="320" y="188">config.ts</text><text class="svg-small" x="306" y="210">load/merge/validate</text>
+              <rect class="node" x="492" y="154" width="162" height="72" rx="18"/><text class="svg-label" x="530" y="188">types.ts</text><text class="svg-small" x="520" y="210">schema shapes</text>
+              <rect class="node" x="686" y="154" width="170" height="72" rx="18"/><text class="svg-label" x="728" y="188">display.ts</text><text class="svg-small" x="718" y="210">banner/toast</text>
+              <rect class="node-green" x="36" y="280" width="190" height="80" rx="18"/><text class="svg-label" x="88" y="314">cli.ts</text><text class="svg-small" x="66" y="338">commands surface</text>
+              <rect class="node-green" x="270" y="280" width="190" height="80" rx="18"/><text class="svg-label" x="320" y="314">install.ts</text><text class="svg-small" x="300" y="338">writes OpenCode files</text>
+              <rect class="node-green" x="500" y="280" width="190" height="80" rx="18"/><text class="svg-label" x="535" y="314">onboarding.ts</text><text class="svg-small" x="528" y="338">interactive wizard</text>
+              <rect class="node-green" x="728" y="280" width="160" height="80" rx="18"/><text class="svg-label" x="756" y="314">models-report</text><text class="svg-small" x="752" y="338">model discovery</text>
+            </svg>
+          </figure>
+        </section>
+
+        <section id="logic">
+          <p class="section-kicker">Часть 6</p>
+          <h2><a class="anchor" href="#logic">Логика шаг за шагом</a></h2>
+          <h3>Сценарий 1: первичная установка</h3>
+          <ol class="steps">
+            <li><strong>Пользователь запускает CLI.</strong> Команда входит в <code>src/cli.ts</code>, где выбирается handler для <code>init</code>.</li>
+            <li><strong>Мастер ищет модели.</strong> <code>src/onboarding.ts</code> использует модельный отчёт из <code>src/models-report.ts</code>, который запускает <code>opencode models --verbose</code>.</li>
+            <li><strong>Пользователь выбирает router и tiers.</strong> Для каждого tier выбирается <code>provider/model</code>; при необходимости пользователь вводит строку вручную.</li>
+            <li><strong>Конфиг записывается.</strong> <code>writeRouterConfig()</code> из <code>src/config.ts</code> сохраняет JSON в глобальный или проектный путь.</li>
+            <li><strong>Инсталлятор создаёт OpenCode‑файлы.</strong> <code>src/install.ts</code> пишет plugin loader, agent files и slash commands.</li>
+          </ol>
+
+          <h3>Сценарий 2: автоматическая маршрутизация запроса</h3>
+          <ol class="steps">
+            <li><strong>Сообщение попадает в OpenCode.</strong> <code>chat.message</code> hook из <code>src/plugin.ts</code> получает пользовательский текст.</li>
+            <li><strong>Загружается конфигурация.</strong> <code>loadRouterConfig()</code> объединяет defaults, global config и project config.</li>
+            <li><strong>Вызов <code>routeRequest()</code>.</strong> <code>src/router.ts</code> проверяет режим, enabled flag и forced prefixes.</li>
+            <li><strong>Router model классифицирует запрос.</strong> Prompt строится в <code>src/prompts.ts</code>, ответ проверяется по ожидаемой структуре.</li>
+            <li><strong>Выбирается tier model.</strong> Например, <code>large</code> превращается в конкретный <code>provider/model</code> из <code>config.tiers.large.model</code>.</li>
+            <li><strong>Плагин меняет модель сообщения.</strong> OpenCode продолжает обычное выполнение, но уже с выбранной моделью.</li>
+            <li><strong>Пользователь видит объяснение.</strong> <code>src/display.ts</code> формирует routing banner и, если включено, toast.</li>
+          </ol>
+
+          <h3>Сценарий 3: принудительный override через prefix</h3>
+          <ol class="steps">
+            <li>Пользователь пишет <code>/large спроектируй стратегию миграции</code>.</li>
+            <li><code>routeRequest()</code> смотрит <code>config.routing.forceTierPrefixes</code>, где по умолчанию есть <code>/fast</code>, <code>/balanced</code>, <code>/large</code>.</li>
+            <li>Prefix удаляется из текста, чтобы целевая модель не видела служебную команду как часть задачи.</li>
+            <li>Router model не вызывается: решение уже принято пользователем.</li>
+            <li><code>RoutingResult</code> помечается как forced, а banner может показать, что выбор был ручным.</li>
+          </ol>
+
+          <h3>Сценарий 4: изменение конфигурации и reload</h3>
+          <ol class="steps">
+            <li>Пользователь вызывает <code>oc-router config set ...</code> в <code>src/cli.ts</code>.</li>
+            <li>CLI читает текущий конфиг через <code>loadRouterConfig()</code> или целевой файл напрямую, меняет значение и пишет JSON через <code>writeRouterConfig()</code>.</li>
+            <li>При следующем hook‑вызове plugin снова загружает конфиг. В проекте нет отдельной базы или long‑running config cache, поэтому модель поведения проста: файл — источник правды.</li>
+            <li><code>validateRouterConfig()</code> ловит ошибки вроде неверного <code>provider/model</code>.</li>
+          </ol>
+
+          <h3>Сценарий 5: восстановление после ошибки</h3>
+          <ol class="steps">
+            <li>Router model недоступна, возвращает не JSON или выбирает неизвестный tier.</li>
+            <li><code>src/router.ts</code> не выбрасывает ошибку наружу как фатальную для OpenCode‑сессии.</li>
+            <li>Выбирается <code>config.fallbackTier</code>, по умолчанию <code>balanced</code>.</li>
+            <li>Пользователь получает рабочий ответ, а не сломанную сессию.</li>
+            <li>Диагностику можно выполнить через <code>oc-router doctor</code>.</li>
+          </ol>
+        </section>
+
+        <section id="decisions">
+          <p class="section-kicker">Часть 7</p>
+          <h2><a class="anchor" href="#decisions">Решения, которые не видны снаружи</a></h2>
+          <div class="two-col">
+            <div class="mini-card"><h4>Почему три tier, а не два или четыре?</h4><p>Три — это понятная шкала риска: разведка, обычная работа, сложная работа. Два tier заставили бы смешивать «обычное» и «сложное»; четыре усложнили бы выбор и конфиг без очевидной выгоды.</p></div>
+            <div class="mini-card"><h4>Почему отдельный CLI?</h4><p>OpenCode не документирует расширение top‑level CLI плагинами. Поэтому <code>oc-router</code> честно живёт рядом: устанавливает файлы OpenCode и показывает, что именно изменил.</p></div>
+            <div class="mini-card"><h4>Почему synthetic message parts?</h4><p>Баннер становится частью видимого разговора и объясняет выбор модели там, где пользователь уже смотрит. Toast хорош для мгновенного сигнала, но баннер остаётся в контексте.</p></div>
+            <div class="mini-card"><h4>Почему context handoff?</h4><p>Полное автоматическое разделение контекста между моделями дорого и непрозрачно. Handoff — явный контракт: что прочитано, что найдено, что остаётся неизвестным.</p></div>
+            <div class="mini-card"><h4>Почему права для @fast?</h4><p><code>@fast</code> оптимизирован как дешёвый разведчик. Ограничения превращают это намерение в механизм безопасности, а не просто рекомендацию в prompt.</p></div>
+            <div class="mini-card"><h4>Почему ошибки не фатальны?</h4><p>Маршрутизатор — вспомогательный слой. Если он падает, базовый OpenCode должен продолжать работать. Поэтому fallback важнее строгой остановки.</p></div>
+          </div>
+          <div class="callout warn"><strong>Честный пробел:</strong> из переданного контекста не анализировались производительность router model calls, конкурентные запросы, взаимодействие с другими плагинами OpenCode и реальная совместимость с разными версиями OpenCode. Архитектура выглядит рассчитанной на устойчивость, но эти аспекты требуют отдельной проверки.</div>
+        </section>
+
+        <section id="run">
+          <p class="section-kicker">Часть 8</p>
+          <h2><a class="anchor" href="#run">Как запустить и попробовать</a></h2>
+          <p>Ниже — практический путь для первого знакомства. Команды основаны на структуре проекта и README‑описании из контекста.</p>
+          <ol class="steps">
+            <li><strong>Соберите проект.</strong> В корне <code>/home/user128/oc-router</code> выполните <code>npm install</code>, затем <code>npm run build</code>. Ожидаемый результат: TypeScript компилируется в <code>dist/</code>.</li>
+            <li><strong>Запустите тесты.</strong> Выполните <code>npm test</code>. Тесты Vitest покрывают config, router, display, plugin hooks, install и CLI‑поведение.</li>
+            <li><strong>Инициализируйте настройку.</strong> Запустите <code>oc-router init</code> или локальный бинарь после сборки. Мастер должен показать доступные модели OpenCode или позволить ввести ID вручную.</li>
+            <li><strong>Проверьте конфиг.</strong> Выполните <code>oc-router status</code> или <code>oc-router doctor</code>. Вы должны увидеть, включён ли routing, какие модели назначены tier‑ам, и есть ли проблемы.</li>
+            <li><strong>Попробуйте обычный запрос.</strong> В OpenCode напишите просьбу вроде «найди файлы, где описана конфигурация». Должен появиться routing banner с выбранным tier и причиной.</li>
+            <li><strong>Попробуйте override.</strong> Напишите <code>/large объясни архитектурные риски этого проекта</code>. Router model должна быть обойдена, а запрос должен пойти в <code>large</code>.</li>
+          </ol>
+          <div class="code-card"><div class="code-head"><span>terminal</span><span>первый запуск</span></div><div class="code-note">Команды показывают минимальный цикл: собрать, проверить, настроить, диагностировать.</div><pre><code><span class="ln">1</span>npm install
+<span class="ln">2</span>npm run build
+<span class="ln">3</span>npm test
+<span class="ln">4</span>oc-router init
+<span class="ln">5</span>oc-router doctor
+<span class="ln">6</span>oc-router models</code></pre></div>
+          <p>Если запомнить одну вещь: <strong>oc-router</strong> не пытается быть ещё одной моделью. Он делает более полезную работу — выбирает правильного исполнителя и объясняет этот выбор.</p>
+        </section>
+
+        <footer>
+          <p>Статья создана по переданному CONTEXT HANDOFF: прочитанные файлы, архитектурные факты и известные ограничения указаны в тексте. Кодовые идентификаторы оставлены на английском, объяснения — на русском.</p>
+        </footer>
+      </article>
+    </main>
+  </div>
+</body>
+</html>
