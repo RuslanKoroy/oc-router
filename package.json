@@ -15,17 +15,8 @@
   },
   "files": [
     "dist",
-    "README.md",
-    "LICENSE"
+    "README.md"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/RuslanKoroy/oc-router.git"
-  },
-  "bugs": {
-    "url": "https://github.com/RuslanKoroy/oc-router/issues"
-  },
-  "homepage": "https://github.com/RuslanKoroy/oc-router#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -30,6 +30,13 @@ try {
     # Get repository root directory (relative to script location)
     $repoRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Path
 
+    # Add npm bin dir to PATH for current session
+    $npmBinDir = Join-Path $env:APPDATA "npm"
+    if (-not ($env:PATH.Split(";") | Where-Object { $_ -eq $npmBinDir })) {
+        Write-Info "Adding $npmBinDir to PATH for this session..."
+        $env:PATH = "$npmBinDir;$env:PATH"
+    }
+
     # Check if Node.js is installed
     $nodeVersion = $null
     try {
@@ -84,6 +91,8 @@ try {
     Write-Step "📦 Installing oc-router globally..."
     npm install -g .
 
+    Pop-Location
+
     # Verify installation
     $installed = $false
     $installedVersion = $null
@@ -96,8 +105,6 @@ try {
         $installed = $false
     }
 
-    Pop-Location
-
     Write-Host ""
     if ($installed) {
         Write-Success "✅ oc-router v$installedVersion installed successfully!"
@@ -106,9 +113,23 @@ try {
         Write-Info "Note: You may need to restart your terminal or reload your PATH."
     }
 
+    # Initialize oc-router configuration (update OpenCode config, create plugin and agents)
+    Write-Host ""
+    Write-Step "⚙️ Configuring oc-router..."
+    try {
+        oc-router init --global --yes 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "✓ oc-router configured successfully"
+        } else {
+            Write-Info "⚠ Could not configure automatically. Run manually: oc-router init --global"
+        }
+    } catch {
+        Write-Info "⚠ Could not configure automatically. Run manually: oc-router init --global"
+    }
+
     Write-Host ""
     Write-Info "To verify, run: oc-router --version"
-    Write-Info "To start setup, run: oc-router init --global"
+    Write-Info "To check status, run: oc-router status"
 
 } catch {
     Write-Error "❌ Installation failed: $_"

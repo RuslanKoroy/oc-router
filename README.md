@@ -7,10 +7,6 @@
 
 **oc-router** is an intelligent routing helper for [OpenCode](https://opencode.ai/) that chooses the right model tier for every task, keeps context handoffs clean, and makes multi-model workflows predictable.
 
-⭐ **Star the project:** [github.com/RuslanKoroy/oc-router](https://github.com/RuslanKoroy/oc-router)  
-👀 **Watch releases:** [GitHub Watch](https://github.com/RuslanKoroy/oc-router/subscription)  
-🐛 **Report issues:** [GitHub Issues](https://github.com/RuslanKoroy/oc-router/issues)
-
 ---
 
 ## 📌 Introduction
@@ -50,111 +46,55 @@ OpenCode is powerful because it can work with different models and agents. In pr
 
 ---
 
-## 📦 Installation
+### 🚀 Quick Start
 
-### From source (clone and install)
-
-```bash
-git clone https://github.com/RuslanKoroy/oc-router.git
-cd oc-router
-npm install -g .
-```
-
-### Platform-specific scripts
-
-**Linux / macOS:**
-
-```bash
-./install.sh
-npm install -g .
-```
-
-**Windows (PowerShell):**
+**For Windows:**
 
 ```powershell
+# clone repo
+git clone https://github.com/RuslanKoroy/oc-router.git
+
+# install with PowerShell
 .\install.ps1
+
+# OR manually
 npm install -g .
-```
 
-**Windows (CMD):**
-
-```cmd
-npm install -g .
-```
-
-### Verify installation
-
-```bash
-oc-router doctor
-```
-
-After installation, restart OpenCode or reload your shell session.
-
-### Development install
-
-Use this mode when you want to modify oc-router locally.
-
-```bash
-git clone https://github.com/RuslanKoroy/oc-router.git
-cd oc-router
-npm install
-npm run build
-npm link
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Install oc-router
-
-```bash
-git clone https://github.com/RuslanKoroy/oc-router.git
-cd oc-router
-./install.sh
-```
-
-### 2. Initialize configuration
-
-```bash
+# initialize
 oc-router init --global
 ```
 
-### 3. Verify installation
+**For macOS/Linux:**
 
 ```bash
-oc-router --version
-oc-router status
-```
+# clone repo
+git clone https://github.com/RuslanKoroy/oc-router.git
 
-### 4. Use OpenCode normally
+# install with bash
+.\install.sh
 
-```text
-Fix the failing tests and explain the root cause.
-```
+# OR manually
+npm install -g .
 
-oc-router will classify the request and route it to the most suitable tier.
-
----
-
-### Initialize oc-router
-
-Create your initial configuration file:
-
-```bash
-# Global configuration (recommended for terminal-wide usage)
+# initialize
 oc-router init --global
-
-# Project-specific configuration
-oc-router init --project
 ```
 
-> 💡 **What's the difference?**
-> 
-> - `--global`: Creates `~/.config/oc-router/config.json` (Linux/macOS) or `%APPDATA%\oc-router\config.json` (Windows)
-> - `--project`: Creates `.oc-router/config.json` in your current repository
->
-> **Recommendation**: Use `--global` for terminal-wide settings, and `--project` for repository-specific overrides.
+**What is created during installation:**
+
+| File | Description |
+|------|-------------|
+| `%APPDATA%/opencode/opencode.json` | registers the oc-router plugin |
+| `%APPDATA%/opencode/router.json` | routing settings with real models |
+| `%APPDATA%/opencode/agents/*.md` | agents @router, @fast, @balanced, @large |
+| `%APPDATA%/opencode/plugins/oc-router.js` | plugin loader |
+| `%APPDATA%/opencode/models.md` | report on available models |
+
+**Platform paths:**
+
+- **Windows**: `%APPDATA%` (typically `C:\Users\<Username>\AppData\Roaming`)
+- **macOS/Linux**: `~/.config` (`/home/<username>/.config`)
+- **Project**: `.opencode/` in your repository (overrides global config by priority)
 
 ---
 
@@ -174,9 +114,80 @@ Configuration can be stored globally for all projects or locally inside a projec
 - **Global:** `%APPDATA%\oc-router\config.json` (typically `C:\Users\<Username>\AppData\Roaming\oc-router\`)
 - **Project:** `.oc-router\config.json` (repository root)
 
-> 💡 **Tip:** Run `oc-router config show` to see the actual path to your current config file.
+### Config example
 
-### Complete JSON example
+Simple config.json example:
+
+```json
+{
+  "enabled": true,
+  "mode": "auto",
+  "router": {
+    "model": "deepinfra/zai-org/GLM-4.7-Flash",
+    "temperature": 0,
+    "timeoutMs": 12000,
+    "maxRetries": 1,
+    "prompts": {
+      "system": "Classify each OpenCode user request into exactly one model tier: fast, balanced, or large.\nReturn only JSON matching the router decision schema.\nUse balanced as the default tier.\nUse fast only for reading and exploring code, simple commands, and low-risk information gathering.\nUse large for architecture, research, high-quality code generation, non-obvious solutions, and difficult problems.",
+      "userTemplate": "Available tiers:\n{tiers}\n\nRequest:\n{request}"
+    }
+  },
+  "tiers": {
+    "fast": {
+      "model": "deepinfra/zai-org/GLM-4.7-Flash",
+      "description": "Fast, cheap model for lightweight OpenCode work.",
+      "whenToUse": "Use only for reading and studying code, simple commands, quick searches, summaries, and low-risk exploration. Do not use for writing production code or solving complex problems."
+    },
+    "balanced": {
+      "model": "zai-coding-plan/glm-5.1",
+      "description": "Default model for day-to-day OpenCode work and design tasks.",
+      "whenToUse": "Use by default for normal development tasks, UI and UX design, frontend, routine edits, ordinary debugging, tests, documentation, and tasks that are not clearly fast-only or large-worthy."
+    },
+    "large": {
+      "model": "openai/gpt-5.5",
+      "description": "Most capable model for high-value reasoning and implementation.",
+      "whenToUse": "Use for architecture, research, complex debugging, difficult problems, non-obvious solutions, high-quality code generation, security-sensitive changes, and work where mistakes are expensive."
+    }
+  },
+  "fallbackTier": "balanced",
+  "display": {
+    "showToast": true,
+    "injectMessage": true,
+    "includeReason": true
+  },
+  "routing": {
+    "preferCheapForReadOnly": true,
+    "largeKeywords": [
+      "architecture",
+      "security",
+      "refactor",
+      "migration",
+      "design"
+    ],
+    "fastKeywords": [
+      "typo",
+      "format",
+      "explain",
+      "rename"
+    ],
+    "forceTierPrefixes": [
+      {
+        "prefix": "/fast",
+        "tier": "fast"
+      },
+      {
+        "prefix": "/balanced",
+        "tier": "balanced"
+      },
+      {
+        "prefix": "/large",
+        "tier": "large"
+      }
+    ],
+    "minConfidence": 0.5
+  }
+}
+```
 
 The following example shows a comprehensive configuration with realistic defaults and all major option groups.
 
@@ -464,6 +475,18 @@ Analyze this failing integration test, identify the root cause, and implement a 
 
 oc-router classifies the request and selects a tier such as `balanced` or `large`.
 
+```mermaid
+flowchart LR
+  A[User request] --> B[oc-router classifier]
+  B --> C{Task complexity}
+  C -->|Simple| D[@fast]
+  C -->|Normal| E[@balanced]
+  C -->|Complex or risky| F[@large]
+  D --> G[OpenCode execution]
+  E --> G
+  F --> G
+```
+
 ### Forced tier prefixes
 
 Use a forced prefix when you already know which tier should handle the task.
@@ -485,6 +508,47 @@ Use a forced prefix when you already know which tier should handle the task.
 | `/fast` | `fast` | Simple edits, short answers, low-risk tasks |
 | `/balanced` | `balanced` | Normal coding, tests, refactoring, documentation |
 | `/large` | `large` | Architecture, security, hard debugging, high-risk changes |
+
+### Context handoff
+
+Use context handoff when one tier prepares work for another tier.
+
+Examples:
+
+```text
+@fast inspect the repository and summarize the files relevant to routing configuration.
+```
+
+```text
+@balanced implement the plan from the handoff and run the relevant tests.
+```
+
+```text
+@large use the handoff context to review the design for correctness and security risks.
+```
+
+A good handoff should include:
+
+- Goal and current status
+- Files already read or modified
+- Commands already run
+- Known failures or uncertainty
+- Exact next steps
+
+### Router failure handling
+
+If the router cannot classify a request, oc-router should fail safely:
+
+```text
+Router classification failed; using the configured fallback tier.
+```
+
+Recommended fallback behavior:
+
+- Use `balanced` for general reliability.
+- Use `manual-only` when configuration is invalid.
+- Show a toast or banner when fallback routing occurs.
+- Do not silently escalate to expensive models unless explicitly configured.
 
 ---
 
@@ -529,18 +593,41 @@ oc-router sits between the user request and OpenCode tier execution.
 │  prefix parser   │
 └────────┬─────────┘
          │
-         ├────────────── forced prefix ───────────────┐
+         ├────────────── forced prefix ──────────────┐
          │                                            │
          ▼                                            ▼
-┌──────────────────┐                         ┌────────────────────┐
-│ Router Classifier│                         │ Selected Tier      │
+┌──────────────────┐                         ┌──────────────────┐
+│ Router Classifier│                         │ Selected Tier     │
 │ auto/manual/off  │                         │ fast/balanced/large│
-└────────┬─────────┘                         └────────┬───────────┘
+└────────┬─────────┘                         └────────┬─────────┘
          │                                            │
          ▼                                            ▼
-┌──────────────────┐                         ┌───────────────────┐
+┌──────────────────┐                         ┌──────────────────┐
 │ Fallback Policy  │────────────────────────▶│ OpenCode Agent    │
-└──────────────────┘                         └───────────────────┘
+└──────────────────┘                         └──────────────────┘
+```
+
+### Decision flow
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Router as oc-router
+  participant Config
+  participant Agent as OpenCode tier agent
+
+  User->>Router: Submit prompt
+  Router->>Config: Load effective config
+  Router->>Router: Detect forced prefix
+  alt Forced tier found
+    Router->>Agent: Dispatch to selected tier
+  else Auto routing enabled
+    Router->>Router: Classify task complexity
+    Router->>Agent: Dispatch to best tier
+  else Routing disabled
+    Router->>Agent: Continue without routing
+  end
+  Agent->>User: Return result
 ```
 
 ### Tier selection guide
@@ -554,7 +641,185 @@ oc-router sits between the user request and OpenCode tier execution.
 
 ---
 
+## 🌍 Platform Paths
+
+### Windows
+
+All paths are listed for a typical installation. `<Username>` is your Windows username.
+
+| File / Directory | Path |
+|---|---|
+| Router configuration | `%APPDATA%\oc-router\config.json` |
+| Models report | `%APPDATA%\oc-router\models.md` |
+| OpenCode configuration | `%APPDATA%\opencode\opencode.json` |
+| Plugin | `%APPDATA%\opencode\plugins\oc-router.js` |
+| Agents | `%APPDATA%\opencode\agents\router.md`, `fast.md`, `balanced.md`, `large.md` |
+| Commands (project) | `.opencode\commands\router-*.md` |
+
+Typical full path: `C:\Users\<Username>\AppData\Roaming\...`
+
+> 💡 To quickly open `%APPDATA%` in File Explorer, press `Win + R`, type `%APPDATA%`, and press Enter.
+
+### Linux / macOS
+
+| File / Directory | Path |
+|---|---|
+| Router configuration | `~/.config/oc-router/config.json` |
+| Models report | `~/.config/oc-router/models.md` |
+| OpenCode configuration | `~/.config/opencode/opencode.json` |
+| Plugin | `~/.config/opencode/plugins/oc-router.js` |
+| Agents | `~/.config/opencode/agents/router.md`, `fast.md`, `balanced.md`, `large.md` |
+| Commands (project) | `.opencode/commands/router-*.md` |
+
+> 💡 To find the path for your system: `oc-router status`.
+
+### Project files (all platforms)
+
+Project-level files are always created in the repository root:
+
+| File | Path |
+|---|---|
+| Router configuration | `.opencode/router.json` |
+| Models report | `.opencode/router-models.md` |
+| OpenCode configuration | `opencode.json` (in project root) |
+| Plugin | `.opencode/plugins/oc-router.js` |
+| Agents | `.opencode/agents/router.md`, `fast.md`, `balanced.md`, `large.md` |
+| Commands | `.opencode/commands/router-*.md` |
+
+---
+
 ## 🧯 Troubleshooting
+
+### 🔴 `oc-router` command not found (Windows)
+
+**Symptoms**
+
+When you type `oc-router --version` in PowerShell or CMD, you get the error:
+
+```text
+oc-router : The term 'oc-router' is not recognized as the name of a cmdlet, function, script file, or operable program.
+```
+
+**Cause**
+
+npm installed the command to `%APPDATA%\npm`, but this path is not in your PATH variable.
+
+**Solution**
+
+1. **Quick fix** — add to PATH for the current PowerShell session:
+
+```powershell
+$env:PATH = "$env:APPDATA\npm;$env:PATH"
+```
+
+2. **Permanent fix** — add `%APPDATA%\npm` to PATH via system settings:
+
+   - Press `Win + R`, type `sysdm.cpl`, and press Enter
+   - Go to the "Advanced" tab → "Environment Variables"
+   - Under "User variables", find `Path` → "Edit"
+   - Add: `%APPDATA%\npm`
+   - Click OK, restart your terminal
+
+3. **Verify that npm global packages are installed:**
+
+```powershell
+npm list -g --depth=0
+```
+
+You should see `oc-router@0.1.0`.
+
+### 🔴 Plugin does not connect to OpenCode
+
+**Symptoms**
+
+- Prefixes `/fast`, `/balanced`, `/large` do not work
+- Routing banner does not appear
+- OpenCode does not show the `@router` agent
+
+**Solution — step-by-step check:**
+
+1. **Check the opencode.json file** — it must contain `"oc-router"` in the `plugin` array:
+
+```powershell
+# Windows (PowerShell)
+Get-Content "$env:APPDATA\opencode\opencode.json"
+
+# Linux / macOS
+cat ~/.config/opencode/opencode.json
+```
+
+Expected contents:
+
+```json
+{
+  "plugin": ["oc-router"],
+  "default_agent": "router"
+}
+```
+
+2. **Check the plugin file:**
+
+```powershell
+# Windows (PowerShell)
+Test-Path "$env:APPDATA\opencode\plugins\oc-router.js"
+
+# Linux / macOS
+ls ~/.config/opencode/plugins/oc-router.js
+```
+
+3. **Check the agent files:**
+
+```powershell
+# Windows (PowerShell)
+Get-ChildItem "$env:APPDATA\opencode\agents\*.md"
+
+# Linux / macOS
+ls ~/.config/opencode/agents/
+```
+
+The following files should exist: `router.md`, `fast.md`, `balanced.md`, `large.md`.
+
+4. **Restart OpenCode** — configuration changes require a restart:
+
+```bash
+opencode
+```
+
+### 🔴 Agent @router is not registered
+
+**Symptoms**
+
+OpenCode starts, but the `@router` agent is not in the list of available agents.
+
+**Solution**
+
+1. Verify that `default_agent` is set in `opencode.json`:
+
+```json
+{
+  "default_agent": "router"
+}
+```
+
+2. Verify that the `agents/router.md` file exists and contains valid frontmatter:
+
+```yaml
+---
+description: OpenCode Router default agent...
+mode: primary
+model: <provider/model>
+permission:
+  task: allow
+---
+```
+
+3. Recreate the configuration:
+
+```bash
+oc-router init --global
+```
+
+4. Restart OpenCode.
 
 ### Router does not activate
 
@@ -567,8 +832,8 @@ oc-router sits between the user request and OpenCode tier execution.
 
 ```bash
 oc-router doctor
-oc-router config show
-oc-router config validate
+oc-router status
+oc-router config get
 ```
 
 Also verify that you are using **OpenCode 0.11.0+**.
@@ -587,7 +852,7 @@ Also verify that you are using **OpenCode 0.11.0+**.
 - Check that every tier referenced by routing settings exists in `tiers`.
 
 ```bash
-oc-router config validate
+oc-router status
 ```
 
 ### Wrong tier selected
@@ -607,20 +872,6 @@ oc-router config validate
 /large Debug this race condition and explain the failure mode.
 ```
 
-### Colors or banners look broken
-
-**Symptoms**
-
-- Terminal output has incorrect colors.
-- Banner appears in an inconvenient location.
-
-**Solutions**
-
-```bash
-oc-router config set display.colors.enabled false
-oc-router config set display.banner.position inline
-```
-
 ### Router model timeout
 
 **Symptoms**
@@ -634,6 +885,16 @@ oc-router config set display.banner.position inline
 - Increase `routerModel.timeoutMs` if your provider is slow.
 - Keep `routerModel.fallbackOnError` enabled.
 
+### Common issues and solutions
+
+| Issue | Solution |
+|---|---|
+| `oc-router` not found | Add `%APPDATA%\npm` to PATH and restart the terminal |
+| Plugin does not load | Check `opencode.json` → `plugin: ["oc-router"]` |
+| Configuration is invalid | `oc-router init --global` to recreate |
+| Slow routing | Increase `routerModel.timeoutMs` or use `/fast` prefixes |
+| Need to reset settings | `oc-router init --global` recreates all files |
+
 ---
 
 ## 🛠️ Development
@@ -644,19 +905,6 @@ oc-router config set display.banner.position inline
 - npm
 - OpenCode 0.11.0+
 - TypeScript
-
-### Build
-
-```bash
-npm install
-npm run build
-```
-
-### Test
-
-```bash
-npm test
-```
 
 ### Development workflow
 
@@ -678,5 +926,8 @@ Created and maintained by **RuslanKoroy**.
 - Telegram: [t.me/xkcd0000](https://t.me/xkcd0000)
 - TG Channel: [t.me/curseknowledge](https://t.me/curseknowledge)
 - Repository: [github.com/RuslanKoroy/oc-router](https://github.com/RuslanKoroy/oc-router)
+
+👀 **Watch releases:** [GitHub Watch](https://github.com/RuslanKoroy/oc-router/subscription)  
+🐛 **Report issues:** [GitHub Issues](https://github.com/RuslanKoroy/oc-router/issues)
 
 If oc-router helps your OpenCode workflow, consider starring the repository and sharing feedback.

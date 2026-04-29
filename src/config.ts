@@ -94,10 +94,15 @@ export function mergeConfig(...items: Array<PartialRouterConfig | undefined>): R
 export function loadRouterConfig(paths: { globalPath?: string; projectPath?: string } = {}) {
   const globalPath = paths.globalPath ?? globalConfigPath()
   const projectPath = paths.projectPath ?? projectConfigPath()
+  const globalPartial = readConfig(globalPath)
+  const projectPartial = readConfig(projectPath)
+  if (!globalPartial && !projectPartial) {
+    console.warn(`[oc-router] No config found at global (${globalPath}) or project (${projectPath}) path — using defaults`)
+  }
   return {
     globalPath,
     projectPath,
-    config: mergeConfig(readConfig(globalPath), readConfig(projectPath)),
+    config: mergeConfig(globalPartial, projectPartial),
   }
 }
 
