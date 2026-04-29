@@ -3,7 +3,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { defaultConfig, mergeConfig, writeRouterConfig } from "./config.js"
 import { globalConfigPath, globalModelsReportPath, globalOpenCodeAgentsDir, globalOpenCodeConfigPath, globalOpenCodePluginsDir, projectConfigPath, projectModelsReportPath, projectOpenCodeAgentsDir, projectOpenCodeCommandsDir, projectOpenCodeConfigPath, projectOpenCodePluginsDir } from "./paths.js"
-import { buildModelsReport, listOpenCodeModels } from "./models-report.js"
+import { buildModelsReport, listOpenCodeModels, pickModelsForTiers } from "./models-report.js"
 import type { RouterConfig, Tier } from "./types.js"
 
 function readJson(path: string): any {
@@ -20,7 +20,9 @@ export function ensureOpenCodePlugin(path: string, pluginName = "oc-router") {
   const config = readJson(path)
   const current = Array.isArray(config.plugin) ? config.plugin : []
   const legacyPluginName = ["opencode", "router"].join("-")
-  config.plugin = current.filter((item: unknown) => item !== pluginName && item !== legacyPluginName)
+  // Remove stale/legacy entries, then add the current plugin name
+  const cleaned = current.filter((item: unknown) => item !== pluginName && item !== legacyPluginName)
+  config.plugin = [...cleaned, pluginName]
   config.default_agent = "router"
   writeJson(path, config)
 }
@@ -140,11 +142,28 @@ function reportPath(cwd: string, scope: "project" | "global") {
 
 export function installRouter(input: { cwd: string; scope: "project" | "global"; yes: boolean; modelsOutput?: string; config?: RouterConfig }) {
   const routerPath = input.scope === "project" ? projectConfigPath(input.cwd) : globalConfigPath()
-  const config = input.config ?? (existsSync(routerPath) ? mergeConfig(readJson(routerPath)) : defaultConfig)
+  const modelsOutput = input.modelsOutput ?? listOpenCodeModels(input.cwd)
+  let config: RouterConfig
+  if (input.config) {
+    config = input.config
+  } else if (existsSync(routerPath)) {
+    config = mergeConfig(readJson(routerPath))
+  } else {
+    // No existing config and none provided — build from detected models
+    const picks = pickModelsForTiers(modelsOutput)
+    config = mergeConfig(defaultConfig, {
+      router: { model: picks.router },
+      tiers: {
+        fast: { model: picks.fast },
+        balanced: { model: picks.balanced },
+        large: { model: picks.large },
+      },
+    })
+  }
   writeRouterConfig(routerPath, config)
   const modelsReportPath = reportPath(input.cwd, input.scope)
   mkdirSync(dirname(modelsReportPath), { recursive: true })
-  writeFileSync(modelsReportPath, buildModelsReport({ modelsOutput: input.modelsOutput ?? listOpenCodeModels(input.cwd) }))
+  writeFileSync(modelsReportPath, buildModelsReport({ modelsOutput }))
 
   if (input.scope === "project") {
     ensureOpenCodePlugin(projectOpenCodeConfigPath(input.cwd))

@@ -65,4 +65,42 @@ describe("router config", () => {
 
     expect(JSON.parse(readFileSync(configPath, "utf8")).enabled).toBe(false)
   })
+
+  test("falls back to global config when no project config exists", () => {
+    const root = tempRoot()
+    const globalPath = join(root, "global.json")
+    const projectPath = join(root, "nonexistent", "project.json")
+    writeFileSync(globalPath, JSON.stringify({ tiers: { fast: { model: "openai/gpt-4o-mini" } } }))
+
+    const loaded = loadRouterConfig({ globalPath, projectPath })
+
+    expect(loaded.config.tiers.fast.model).toBe("openai/gpt-4o-mini")
+    expect(loaded.config.tiers.balanced.model).toBe("provider/balanced-model") // default
+  })
+
+  test("returns defaults with warning when neither global nor project config exists", () => {
+    const root = tempRoot()
+    const globalPath = join(root, "missing-global.json")
+    const projectPath = join(root, "missing-project.json")
+
+    const loaded = loadRouterConfig({ globalPath, projectPath })
+
+    expect(loaded.config.tiers.fast.model).toBe("provider/fast-model")
+    expect(loaded.config.tiers.balanced.model).toBe("provider/balanced-model")
+    expect(loaded.config.tiers.large.model).toBe("provider/large-model")
+    expect(loaded.config.fallbackTier).toBe("balanced")
+  })
+
+  test("project config overrides global config", () => {
+    const root = tempRoot()
+    const globalPath = join(root, "global.json")
+    const projectPath = join(root, "project.json")
+    writeFileSync(globalPath, JSON.stringify({ tiers: { fast: { model: "openai/gpt-4o-mini" }, balanced: { model: "openai/gpt-4o" } } }))
+    writeFileSync(projectPath, JSON.stringify({ tiers: { balanced: { model: "anthropic/claude-sonnet-4-5" } } }))
+
+    const loaded = loadRouterConfig({ globalPath, projectPath })
+
+    expect(loaded.config.tiers.fast.model).toBe("openai/gpt-4o-mini") // from global
+    expect(loaded.config.tiers.balanced.model).toBe("anthropic/claude-sonnet-4-5") // project overrides global
+  })
 })

@@ -82,7 +82,7 @@ export async function runCli(args = process.argv.slice(2), io: IO = { cwd: proce
   }
 
   if (command === "models") {
-    const result = spawnSync("opencode", ["models", "--verbose"], { cwd: io.cwd, encoding: "utf8" })
+    const result = spawnSync("opencode", ["models", "--verbose"], { cwd: io.cwd, encoding: "utf8", shell: process.platform === "win32" })
     if (result.error) {
       io.stderr("Unable to run `opencode models --verbose`. Is OpenCode installed?")
       return 1

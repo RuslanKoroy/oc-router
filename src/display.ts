@@ -18,15 +18,19 @@ export function injectRoutingBanner(output: { parts: any[] }, result: RoutingRes
 }
 
 export async function showRoutingToast(
-  client: { tui?: { showToast?: (input: { body: { message: string; variant: "info" } }) => Promise<unknown> } },
+  client: { tui?: { showToast?: (input: { body: { message: string; variant: "info" } }) => Promise<unknown> }; showToast?: (input: { body: { message: string; variant: "info" } }) => Promise<unknown> },
   result: RoutingResult,
   config: RouterConfig,
 ) {
   if (!config.display.showToast || !result.changed || !result.tier || !result.model) return
+  const toastPayload = { body: { message: `oc-router: ${result.tier} -> ${formatModelID(result.model)}`, variant: "info" as const } }
   try {
-    await client.tui?.showToast?.({
-      body: { message: `oc-router: ${result.tier} -> ${formatModelID(result.model)}`, variant: "info" },
-    })
+    // Support both ctx.client.tui.showToast and ctx.client.showToast APIs
+    if (typeof client.tui?.showToast === "function") {
+      await client.tui.showToast(toastPayload)
+    } else if (typeof (client as any).showToast === "function") {
+      await (client as any).showToast(toastPayload)
+    }
   } catch {
     // TUI APIs are unavailable in some OpenCode clients; routing must remain non-fatal.
   }

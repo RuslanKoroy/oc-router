@@ -1,15 +1,29 @@
 import { spawnSync } from "node:child_process"
 
 export function listOpenCodeModels(cwd: string) {
-  const result = spawnSync("opencode", ["models", "--verbose"], { cwd, encoding: "utf8", timeout: 10_000 })
+  const result = spawnSync("opencode", ["models", "--verbose"], { cwd, encoding: "utf8", timeout: 10_000, shell: process.platform === "win32" })
   if (result.error) return "Unable to run `opencode models --verbose`. Is OpenCode installed and available in PATH?"
   return (result.stdout || result.stderr || "No models returned by `opencode models --verbose`.").trim()
 }
 
-function extractModelIDs(modelsOutput: string) {
+export function extractModelIDs(modelsOutput: string) {
   const ids = new Set<string>()
   for (const match of modelsOutput.matchAll(/\b([a-zA-Z0-9_.-]+\/[\w./:-]+)\b/g)) ids.add(match[1])
   return [...ids].sort()
+}
+
+/**
+ * Given a models output string, pick best-guess model IDs for each tier.
+ * Returns { router, fast, balanced, large } with real model IDs or undefined.
+ */
+export function pickModelsForTiers(modelsOutput: string) {
+  const ids = extractModelIDs(modelsOutput)
+  if (!ids.length) return { router: undefined, fast: undefined, balanced: undefined, large: undefined }
+  const router = ids.find((id) => /mini|haiku|flash|fast|nano/i.test(id)) ?? ids[0]
+  const fast = ids.find((id) => /mini|haiku|flash|fast|nano/i.test(id)) ?? ids[0]
+  const balanced = ids.find((id) => /sonnet|gpt-5|gpt-4|pro|medium/i.test(id)) ?? ids[1] ?? fast
+  const large = ids.find((id) => /opus|large|max|xhigh/i.test(id)) ?? ids[2] ?? balanced
+  return { router, fast, balanced, large }
 }
 
 type ModelInfo = {
@@ -111,9 +125,10 @@ export function buildModelsReport(input: { generatedAt?: Date; modelsOutput: str
   const models = parseModels(input.modelsOutput)
   const modelIDs = models.length ? models.map((model) => model.id) : extractModelIDs(input.modelsOutput)
   const providers = [...new Set((models.length ? models.map((model) => model.provider) : modelIDs.map(providerFromModelID)))].sort()
-  const fast = modelIDs.find((id) => /mini|haiku|flash|small|lite|fast/i.test(id)) ?? modelIDs[0] ?? "provider/fast-model"
-  const balanced = modelIDs.find((id) => /sonnet|gpt-5|gpt-4|pro|medium/i.test(id)) ?? modelIDs[1] ?? fast
-  const large = modelIDs.find((id) => /opus|large|max|xhigh/i.test(id)) ?? modelIDs[2] ?? balanced
+  const picks = pickModelsForTiers(input.modelsOutput)
+  const fast = picks.fast ?? "provider/fast-model"
+  const balanced = picks.balanced ?? fast
+  const large = picks.large ?? balanced
   const grouped = providers.map((provider) => {
     const items = models.filter((model) => model.provider === provider)
     return `### Provider: \`${provider}\`\n\n${items.length ? tableForProvider(items) : "No structured model details detected for this provider."}`

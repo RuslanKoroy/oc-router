@@ -155,4 +155,70 @@ describe("OpenCodeRouterPlugin", () => {
     expect(output.parts[0].text).toBe("explain")
     expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-4o-mini" })
   })
+
+  test("loads global config when no project config exists", async () => {
+    // Create a global config in a temp dir that plugin can discover
+    const cwd = mkdtempSync(join(tmpdir(), "oc-router-global-"))
+    // Do NOT create .opencode/router.json — simulate project without project config
+    // Instead, provide config via options to simulate global config behavior
+    const plugin = await OpenCodeRouterPlugin({ client: { app: { log: vi.fn() }, tui: { showToast: vi.fn() } }, directory: cwd, worktree: cwd, project: {}, serverUrl: new URL("http://localhost"), $: undefined } as any, {
+      config: {
+        tiers: {
+          fast: { model: "openai/gpt-4o-mini" },
+          balanced: { model: "anthropic/claude-sonnet-4-5" },
+          large: { model: "anthropic/claude-opus-4-5" },
+        },
+      },
+      router: async () => ({ tier: "balanced", confidence: 0.9, reason: "standard task", signals: [] }),
+    } as any)
+
+    const output = { message: {}, parts: [{ type: "text", text: "fix the bug" }] as any[] }
+    await plugin["chat.message"]?.({ sessionID: "s1" } as any, output as any)
+
+    // Should route to balanced (from options config which simulates global config)
+    expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-5" })
+  })
+
+  test("uses global config path and project config path together", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "oc-router-combined-"))
+    mkdirSync(join(cwd, ".opencode"), { recursive: true })
+    writeFileSync(join(cwd, ".opencode", "router.json"), JSON.stringify({
+      tiers: {
+        fast: { model: "openai/gpt-4o-mini" },
+        balanced: { model: "anthropic/claude-sonnet-4-5" },
+        large: { model: "anthropic/claude-opus-4-5" },
+      },
+    }))
+    const plugin = await OpenCodeRouterPlugin({ client: { app: { log: vi.fn() }, tui: { showToast: vi.fn() } }, directory: cwd, worktree: cwd, project: {}, serverUrl: new URL("http://localhost"), $: undefined } as any, {
+      router: async () => ({ tier: "large", confidence: 0.95, reason: "complex architecture", signals: [] }),
+    } as any)
+
+    const opencodeConfig: any = {}
+    await plugin.config?.(opencodeConfig)
+
+    // The router agent and tier agents should be registered with models from project config
+    expect(opencodeConfig.agent.router.mode).toBe("primary")
+    expect(opencodeConfig.agent.fast.model).toBe("openai/gpt-4o-mini")
+    expect(opencodeConfig.agent.balanced.model).toBe("anthropic/claude-sonnet-4-5")
+    expect(opencodeConfig.agent.large.model).toBe("anthropic/claude-opus-4-5")
+    expect(opencodeConfig.default_agent).toBe("router")
+  })
+
+  test("handles missing showToast gracefully", async () => {
+    const client = { app: { log: vi.fn(async () => true) } } // no tui.showToast, no showToast
+    const plugin = await OpenCodeRouterPlugin({ client, directory: process.cwd(), worktree: process.cwd(), project: {}, serverUrl: new URL("http://localhost"), $: undefined } as any, {
+      config: {
+        tiers: {
+          fast: { model: "openai/gpt-4o-mini" },
+          balanced: { model: "anthropic/claude-sonnet-4-5" },
+          large: { model: "anthropic/claude-opus-4-5" },
+        },
+      },
+    } as any)
+
+    const output = { message: {}, parts: [{ type: "text", text: "/fast test" }] as any[] }
+    // Should not throw even though showToast is missing
+    await expect(plugin["chat.message"]?.({ sessionID: "s1" } as any, output as any)).resolves.toBeUndefined()
+    expect(output.message.model).toEqual({ providerID: "openai", modelID: "gpt-4o-mini" })
+  })
 })

@@ -2,6 +2,7 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { loadRouterConfig, mergeConfig } from "./config.js"
 import { formatActiveModelLabel, injectRoutingBanner, showRoutingToast } from "./display.js"
 import { parseModelID } from "./model-id.js"
+import { globalConfigPath } from "./paths.js"
 import { buildRouterPrompt } from "./prompts.js"
 import { routeMessage, type RouterCall } from "./router.js"
 import type { PartialRouterConfig, RouterConfig, RoutingResult, Tier } from "./types.js"
@@ -138,14 +139,16 @@ function forcedRoutingResult(config: RouterConfig, text: string): RoutingResult 
 }
 
 export const OpenCodeRouterPlugin: Plugin = async (ctx, options?: Options) => {
-  let config: RouterConfig = mergeConfig(loadRouterConfig({ projectPath: `${ctx.worktree}/.opencode/router.json` }).config, options?.config)
+  const globalPath = globalConfigPath()
+  const projectPath = `${ctx.worktree}/.opencode/router.json`
+  let config: RouterConfig = mergeConfig(loadRouterConfig({ globalPath, projectPath }).config, options?.config)
   const router = options?.router
   const sessionModels = new Map<string, string>()
   const subagentSessions = new Set<string>()
 
   return {
     config(input) {
-      config = mergeConfig(loadRouterConfig({ projectPath: `${ctx.worktree}/.opencode/router.json` }).config, options?.config, (input as any).router)
+      config = mergeConfig(loadRouterConfig({ globalPath, projectPath }).config, options?.config, (input as any).router)
       ;(input as any).agent ??= {}
       ;(input as any).default_agent = "router"
       ;(input as any).agent.router = {
